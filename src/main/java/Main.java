@@ -15,9 +15,7 @@ public class Main {
 
     private static File findExecutable(String command) {
         String path = System.getenv("PATH");
-        if (path == null) {
-            return null;
-        }
+        if (path == null) return null;
 
         for (String dir : path.split(File.pathSeparator)) {
             File file = new File(dir, command);
@@ -25,7 +23,6 @@ public class Main {
                 return file;
             }
         }
-
         return null;
     }
 
@@ -41,31 +38,30 @@ public class Main {
 
             String input = scanner.nextLine();
 
-            if (input.isEmpty()) {
+            if (input.trim().isEmpty()) {
                 continue;
             }
 
             String[] tokens = input.trim().split("\\s+");
             String command = tokens[0];
 
-            if (command.equals("exit")) {
+            if ("exit".equals(command)) {
+                if (tokens.length > 1 && "0".equals(tokens[1])) {
+                    break;
+                }
                 break;
             }
 
-            if (command.equals("echo")) {
-                if (tokens.length > 1) {
-                    for (int i = 1; i < tokens.length; i++) {
-                        if (i > 1) {
-                            System.out.print(" ");
-                        }
-                        System.out.print(tokens[i]);
-                    }
+            if ("echo".equals(command)) {
+                for (int i = 1; i < tokens.length; i++) {
+                    if (i > 1) System.out.print(" ");
+                    System.out.print(tokens[i]);
                 }
                 System.out.println();
                 continue;
             }
 
-            if (command.equals("type")) {
+            if ("type".equals(command)) {
                 if (tokens.length < 2) {
                     continue;
                 }
@@ -83,7 +79,6 @@ public class Main {
                         System.out.println(target + ": not found");
                     }
                 }
-
                 continue;
             }
 
@@ -97,23 +92,22 @@ public class Main {
                     cmd.add(tokens[i]);
                 }
 
-                ProcessBuilder pb = new ProcessBuilder(cmd);
-                Process process = pb.start();
+                Process process = new ProcessBuilder(cmd).start();
 
-                BufferedReader stdout =
+                BufferedReader out =
                         new BufferedReader(
                                 new InputStreamReader(process.getInputStream()));
 
                 String line;
-                while ((line = stdout.readLine()) != null) {
+                while ((line = out.readLine()) != null) {
                     System.out.println(line);
                 }
 
-                BufferedReader stderr =
+                BufferedReader err =
                         new BufferedReader(
                                 new InputStreamReader(process.getErrorStream()));
 
-                while ((line = stderr.readLine()) != null) {
+                while ((line = err.readLine()) != null) {
                     System.out.println(line);
                 }
 
