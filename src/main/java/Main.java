@@ -15,7 +15,9 @@ public class Main {
 
     private static File findExecutable(String command) {
         String path = System.getenv("PATH");
-        if (path == null) return null;
+        if (path == null) {
+            return null;
+        }
 
         for (String dir : path.split(File.pathSeparator)) {
             File file = new File(dir, command);
@@ -23,6 +25,7 @@ public class Main {
                 return file;
             }
         }
+
         return null;
     }
 
@@ -45,23 +48,22 @@ public class Main {
             String[] tokens = input.trim().split("\\s+");
             String command = tokens[0];
 
-            if ("exit".equals(command)) {
-                if (tokens.length > 1 && "0".equals(tokens[1])) {
-                    break;
-                }
+            if (command.equals("exit")) {
                 break;
             }
 
-            if ("echo".equals(command)) {
+            if (command.equals("echo")) {
                 for (int i = 1; i < tokens.length; i++) {
-                    if (i > 1) System.out.print(" ");
+                    if (i > 1) {
+                        System.out.print(" ");
+                    }
                     System.out.print(tokens[i]);
                 }
                 System.out.println();
                 continue;
             }
 
-            if ("type".equals(command)) {
+            if (command.equals("type")) {
                 if (tokens.length < 2) {
                     continue;
                 }
@@ -79,6 +81,7 @@ public class Main {
                         System.out.println(target + ": not found");
                     }
                 }
+
                 continue;
             }
 
@@ -86,28 +89,29 @@ public class Main {
 
             if (executable != null) {
                 List<String> cmd = new ArrayList<>();
-                cmd.add(executable.getAbsolutePath());
+                cmd.add(command);
 
                 for (int i = 1; i < tokens.length; i++) {
                     cmd.add(tokens[i]);
                 }
 
-                Process process = new ProcessBuilder(cmd).start();
+                ProcessBuilder pb = new ProcessBuilder(cmd);
+                Process process = pb.start();
 
-                BufferedReader out =
+                BufferedReader stdout =
                         new BufferedReader(
                                 new InputStreamReader(process.getInputStream()));
 
                 String line;
-                while ((line = out.readLine()) != null) {
+                while ((line = stdout.readLine()) != null) {
                     System.out.println(line);
                 }
 
-                BufferedReader err =
+                BufferedReader stderr =
                         new BufferedReader(
                                 new InputStreamReader(process.getErrorStream()));
 
-                while ((line = err.readLine()) != null) {
+                while ((line = stderr.readLine()) != null) {
                     System.out.println(line);
                 }
 
