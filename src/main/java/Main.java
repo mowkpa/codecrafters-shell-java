@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -23,6 +24,22 @@ public class Main {
             List<String> tokens = parseTokens(input);
             if (tokens.isEmpty()) continue;
 
+            // ── Extract stdout redirection (> or 1>) from token list ──────────
+            File stdoutFile = null;
+            List<String> cleanTokens = new ArrayList<>();
+            for (int i = 0; i < tokens.size(); i++) {
+                String tok = tokens.get(i);
+                if ((tok.equals(">") || tok.equals("1>")) && i + 1 < tokens.size()) {
+                    stdoutFile = new File(tokens.get(i + 1));
+                    i++; // skip the filename token
+                } else {
+                    cleanTokens.add(tok);
+                }
+            }
+            tokens = cleanTokens;
+            if (tokens.isEmpty()) continue;
+            // ─────────────────────────────────────────────────────────────────
+
             String command = tokens.get(0);
             List<String> cmdArgs = tokens.subList(1, tokens.size());
 
@@ -36,14 +53,13 @@ public class Main {
                 System.exit(exitCode);
 
             } else if (command.equals("echo")) {
-                System.out.println(String.join(" ", cmdArgs));
+                printWithRedirect(String.join(" ", cmdArgs), stdoutFile);
 
             } else if (command.equals("pwd")) {
-                System.out.println(System.getProperty("user.dir"));
+                printWithRedirect(System.getProperty("user.dir"), stdoutFile);
 
             } else if (command.equals("cd")) {
                 String target = cmdArgs.isEmpty() ? "~" : cmdArgs.get(0);
-                // Expand ~ to the HOME environment variable
                 if (target.equals("~") || target.startsWith("~/")) {
                     String home = System.getenv("HOME");
                     if (home == null) home = System.getProperty("user.home");
@@ -61,16 +77,14 @@ public class Main {
             } else if (command.equals("type")) {
                 if (cmdArgs.isEmpty()) continue;
                 String arg = cmdArgs.get(0);
+                String msg;
                 if (BUILTINS.contains(arg)) {
-                    System.out.println(arg + " is a shell builtin");
+                    msg = arg + " is a shell builtin";
                 } else {
                     String executablePath = findExecutable(arg);
-                    if (executablePath != null) {
-                        System.out.println(arg + " is " + executablePath);
-                    } else {
-                        System.out.println(arg + ": not found");
-                    }
+                    msg = executablePath != null ? arg + " is " + executablePath : arg + ": not found";
                 }
+                printWithRedirect(msg, stdoutFile);
 
             } else {
                 String executablePath = findExecutable(command);
@@ -79,15 +93,34 @@ public class Main {
                     cmd.add(command);
                     cmd.addAll(cmdArgs);
 
-                    Process process = new ProcessBuilder(cmd)
-                            .inheritIO()
-                            .directory(new File(System.getProperty("user.dir")))
-                            .start();
+                    ProcessBuilder pb = new ProcessBuilder(cmd)
+                            .directory(new File(System.getProperty("user.dir")));
 
-                    process.waitFor();
+                    if (stdoutFile != null) {
+                        // Ensure parent directories exist
+                        if (stdoutFile.getParentFile() != null) stdoutFile.getParentFile().mkdirs();
+                        pb.redirectOutput(stdoutFile);          // stdout → file
+                        pb.redirectError(ProcessBuilder.Redirect.INHERIT); // stderr → terminal
+                    } else {
+                        pb.inheritIO();
+                    }
+
+                    pb.start().waitFor();
                 } else {
                     System.out.println(command + ": not found");
                 }
+            }
+        }
+    }
+
+    /** Prints a line either to stdout or to a file, depending on redirection. */
+    private static void printWithRedirect(String line, File redirectFile) throws Exception {
+        if (redirectFile == null) {
+            System.out.println(line);
+        } else {
+            if (redirectFile.getParentFile() != null) redirectFile.getParentFile().mkdirs();
+            try (PrintStream ps = new PrintStream(redirectFile)) {
+                ps.println(line);
             }
         }
     }
@@ -112,7 +145,6 @@ public class Main {
             char c = input.charAt(i);
 
             if (inSingleQuote) {
-                // Inside single quotes: everything is literal, no escaping whatsoever
                 if (c == '\'') {
                     inSingleQuote = false;
                 } else {
@@ -121,18 +153,15 @@ public class Main {
                 }
 
             } else if (inDoubleQuote) {
-                // Inside double quotes: \ only escapes " \ $ ` and newline
                 if (c == '"') {
                     inDoubleQuote = false;
                 } else if (c == '\\' && i + 1 < input.length()) {
                     char next = input.charAt(i + 1);
                     if (next == '"' || next == '\\' || next == '$' || next == '`' || next == '\n') {
-                        // Consume the backslash; append the escaped char literally
                         i++;
                         current.append(next);
                     } else {
-                        // Backslash is NOT special here — keep it as-is
-                        current.append(c);
+                        current.append(c); // backslash is literal for all other chars
                     }
                     hasToken = true;
                 } else {
@@ -143,13 +172,11 @@ public class Main {
             } else {
                 // Unquoted context
                 if (c == '\\') {
-                    // Backslash: consume next character literally (strip the backslash)
                     if (i + 1 < input.length()) {
                         i++;
                         current.append(input.charAt(i));
                         hasToken = true;
                     }
-                    // Trailing backslash at end of line is ignored
                 } else if (c == '\'') {
                     inSingleQuote = true;
                     hasToken = true;
@@ -157,7 +184,6 @@ public class Main {
                     inDoubleQuote = true;
                     hasToken = true;
                 } else if (c == ' ' || c == '\t') {
-                    // Unquoted whitespace = token delimiter
                     if (hasToken) {
                         tokens.add(current.toString());
                         current.setLength(0);
@@ -170,7 +196,6 @@ public class Main {
             }
         }
 
-        // Add last token if present
         if (hasToken) {
             tokens.add(current.toString());
         }
@@ -180,21 +205,15 @@ public class Main {
 
     private static String findExecutable(String command) {
         String pathEnv = System.getenv("PATH");
-
-        if (pathEnv == null) {
-            return null;
-        }
+        if (pathEnv == null) return null;
 
         String[] paths = pathEnv.split(":");
-
         for (String dir : paths) {
             File file = new File(dir, command);
-
             if (file.isFile() && file.canExecute()) {
                 return file.getAbsolutePath();
             }
         }
-
         return null;
     }
 }
