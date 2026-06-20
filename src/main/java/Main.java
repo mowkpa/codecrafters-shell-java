@@ -1,3 +1,4 @@
+import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Scanner;
@@ -8,7 +9,7 @@ public class Main {
     private static final Set<String> BUILTINS =
             new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd"));
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
 
         while (true) {
@@ -28,6 +29,8 @@ public class Main {
                 } else {
                     System.out.println();
                 }
+            } else if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
             } else if (command.equals("type")) {
                 if (parts.length < 2) {
                     continue;
@@ -38,13 +41,49 @@ public class Main {
                 if (BUILTINS.contains(arg)) {
                     System.out.println(arg + " is a shell builtin");
                 } else {
-                    System.out.println(arg + ": not found");
+                    String executablePath = findExecutable(arg);
+
+                    if (executablePath != null) {
+                        System.out.println(arg + " is " + executablePath);
+                    } else {
+                        System.out.println(arg + ": not found");
+                    }
                 }
-            } else if (command.equals("pwd")) {
-                System.out.println(System.getProperty("user.dir"));
             } else {
-                System.out.println(command + ": not found");
+                String executablePath = findExecutable(command);
+
+                if (executablePath != null) {
+                    String[] tokens = input.split(" ");
+
+                    Process process = new ProcessBuilder(tokens)
+                            .inheritIO()
+                            .start();
+
+                    process.waitFor();
+                } else {
+                    System.out.println(command + ": not found");
+                }
             }
         }
+    }
+
+    private static String findExecutable(String command) {
+        String pathEnv = System.getenv("PATH");
+
+        if (pathEnv == null) {
+            return null;
+        }
+
+        String[] paths = pathEnv.split(File.pathSeparator);
+
+        for (String dir : paths) {
+            File file = new File(dir, command);
+
+            if (file.exists() && file.isFile()) {
+                return file.getAbsolutePath();
+            }
+        }
+
+        return null;
     }
 }
