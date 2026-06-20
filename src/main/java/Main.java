@@ -134,11 +134,24 @@ public class Main {
                 printWithRedirect(msg, stdoutFile, appendStdout);
 
             } else if (command.equals("jobs")) {
+                List<Job> toRemove = new ArrayList<>();
                 for (int i = 0; i < backgroundJobs.size(); i++) {
                     Job job = backgroundJobs.get(i);
                     char marker = (i == backgroundJobs.size() - 1) ? '+' : (i == backgroundJobs.size() - 2) ? '-' : ' ';
-                    System.out.printf("[%d]%c  %-24s%s\n", job.id, marker, "Running", job.command);
+                    if (job.process.isAlive()) {
+                        System.out.printf("[%d]%c  %-24s%s\n", job.id, marker, "Running", job.command);
+                    } else {
+                        String cmd = job.command;
+                        if (cmd.endsWith(" &")) {
+                            cmd = cmd.substring(0, cmd.length() - 2);
+                        } else if (cmd.endsWith("&")) {
+                            cmd = cmd.substring(0, cmd.length() - 1);
+                        }
+                        System.out.printf("[%d]%c  %-24s%s\n", job.id, marker, "Done", cmd);
+                        toRemove.add(job);
+                    }
                 }
+                backgroundJobs.removeAll(toRemove);
 
             } else {
                 String executablePath = findExecutable(command);
