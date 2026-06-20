@@ -1,6 +1,8 @@
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -17,29 +19,30 @@ public class Main {
 
             String input = scanner.nextLine();
 
-            String[] parts = input.split(" ", 2);
-            String command = parts[0];
+            // Parse input into tokens, respecting single quotes
+            List<String> tokens = parseTokens(input);
+            if (tokens.isEmpty()) continue;
+
+            String command = tokens.get(0);
+            List<String> cmdArgs = tokens.subList(1, tokens.size());
 
             if (command.equals("exit")) {
                 int exitCode = 0;
-                if (parts.length > 1) {
+                if (!cmdArgs.isEmpty()) {
                     try {
-                        exitCode = Integer.parseInt(parts[1].trim());
+                        exitCode = Integer.parseInt(cmdArgs.get(0).trim());
                     } catch (NumberFormatException ignored) {}
                 }
                 System.exit(exitCode);
+
             } else if (command.equals("echo")) {
-                if (parts.length > 1) {
-                    System.out.println(parts[1]);
-                } else {
-                    System.out.println();
-                }
+                System.out.println(String.join(" ", cmdArgs));
+
             } else if (command.equals("pwd")) {
                 System.out.println(System.getProperty("user.dir"));
+
             } else if (command.equals("cd")) {
-                String target = (parts.length < 2 || parts[1].trim().isEmpty())
-                        ? "~"
-                        : parts[1].trim();
+                String target = cmdArgs.isEmpty() ? "~" : cmdArgs.get(0);
                 // Expand ~ to the HOME environment variable
                 if (target.equals("~") || target.startsWith("~/")) {
                     String home = System.getenv("HOME");
@@ -52,33 +55,32 @@ public class Main {
                 if (dir.exists() && dir.isDirectory()) {
                     System.setProperty("user.dir", dir.getCanonicalPath());
                 } else {
-                    System.err.println("cd: " + parts[1].trim() + ": No such file or directory");
+                    System.err.println("cd: " + target + ": No such file or directory");
                 }
+
             } else if (command.equals("type")) {
-                if (parts.length < 2) {
-                    continue;
-                }
-
-                String arg = parts[1];
-
+                if (cmdArgs.isEmpty()) continue;
+                String arg = cmdArgs.get(0);
                 if (BUILTINS.contains(arg)) {
                     System.out.println(arg + " is a shell builtin");
                 } else {
                     String executablePath = findExecutable(arg);
-
                     if (executablePath != null) {
                         System.out.println(arg + " is " + executablePath);
                     } else {
                         System.out.println(arg + ": not found");
                     }
                 }
+
             } else {
                 String executablePath = findExecutable(command);
-
                 if (executablePath != null) {
-                    String[] tokens = input.split(" ");
+                    // Build the command list: command + args (already parsed/unquoted)
+                    List<String> cmd = new ArrayList<>();
+                    cmd.add(command);
+                    cmd.addAll(cmdArgs);
 
-                    Process process = new ProcessBuilder(tokens)
+                    Process process = new ProcessBuilder(cmd)
                             .inheritIO()
                             .directory(new File(System.getProperty("user.dir")))
                             .start();
@@ -89,6 +91,57 @@ public class Main {
                 }
             }
         }
+    }
+
+    /**
+     * Parses a shell input line into a list of tokens.
+     * Handles:
+     *  - Single-quoted strings: all chars literal, spaces preserved
+     *  - Unquoted whitespace: used as delimiter (collapsed)
+     *  - Adjacent quoted/unquoted segments: concatenated into one token
+     */
+    private static List<String> parseTokens(String input) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inSingleQuote = false;
+        boolean hasToken = false; // tracks if we've started building a token
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+
+            if (inSingleQuote) {
+                if (c == '\'') {
+                    // End of single-quoted segment
+                    inSingleQuote = false;
+                } else {
+                    current.append(c);
+                    hasToken = true;
+                }
+            } else {
+                if (c == '\'') {
+                    // Start of single-quoted segment
+                    inSingleQuote = true;
+                    hasToken = true; // even empty '' counts as starting a token
+                } else if (c == ' ' || c == '\t') {
+                    // Unquoted whitespace = token delimiter
+                    if (hasToken) {
+                        tokens.add(current.toString());
+                        current.setLength(0);
+                        hasToken = false;
+                    }
+                } else {
+                    current.append(c);
+                    hasToken = true;
+                }
+            }
+        }
+
+        // Add last token if present
+        if (hasToken) {
+            tokens.add(current.toString());
+        }
+
+        return tokens;
     }
 
     private static String findExecutable(String command) {
