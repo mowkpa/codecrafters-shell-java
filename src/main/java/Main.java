@@ -10,7 +10,7 @@ import java.util.Set;
 public class Main {
 
     private static final Set<String> BUILTINS =
-            new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd", "cd"));
+            new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd", "cd", "jobs"));
 
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
@@ -110,6 +110,9 @@ public class Main {
                     msg = executablePath != null ? arg + " is " + executablePath : arg + ": not found";
                 }
                 printWithRedirect(msg, stdoutFile, appendStdout);
+
+            } else if (command.equals("jobs")) {
+                // Empty implementation for now
 
             } else {
                 String executablePath = findExecutable(command);
