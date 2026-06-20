@@ -27,11 +27,17 @@ public class Main {
             // ── Extract redirection from token list ──────────
             File stdoutFile = null;
             File stderrFile = null;
+            boolean appendStdout = false;
             List<String> cleanTokens = new ArrayList<>();
             for (int i = 0; i < tokens.size(); i++) {
                 String tok = tokens.get(i);
-                if ((tok.equals(">") || tok.equals("1>")) && i + 1 < tokens.size()) {
+                if ((tok.equals(">>") || tok.equals("1>>")) && i + 1 < tokens.size()) {
                     stdoutFile = new File(tokens.get(i + 1));
+                    appendStdout = true;
+                    i++; // skip the filename token
+                } else if ((tok.equals(">") || tok.equals("1>")) && i + 1 < tokens.size()) {
+                    stdoutFile = new File(tokens.get(i + 1));
+                    appendStdout = false;
                     i++; // skip the filename token
                 } else if (tok.equals("2>") && i + 1 < tokens.size()) {
                     stderrFile = new File(tokens.get(i + 1));
@@ -45,7 +51,7 @@ public class Main {
 
             if (stdoutFile != null) {
                 if (stdoutFile.getParentFile() != null) stdoutFile.getParentFile().mkdirs();
-                new java.io.FileOutputStream(stdoutFile).close();
+                new java.io.FileOutputStream(stdoutFile, appendStdout).close();
             }
             if (stderrFile != null) {
                 if (stderrFile.getParentFile() != null) stderrFile.getParentFile().mkdirs();
@@ -66,10 +72,10 @@ public class Main {
                 System.exit(exitCode);
 
             } else if (command.equals("echo")) {
-                printWithRedirect(String.join(" ", cmdArgs), stdoutFile);
+                printWithRedirect(String.join(" ", cmdArgs), stdoutFile, appendStdout);
 
             } else if (command.equals("pwd")) {
-                printWithRedirect(System.getProperty("user.dir"), stdoutFile);
+                printWithRedirect(System.getProperty("user.dir"), stdoutFile, appendStdout);
 
             } else if (command.equals("cd")) {
                 String target = cmdArgs.isEmpty() ? "~" : cmdArgs.get(0);
@@ -97,7 +103,7 @@ public class Main {
                     String executablePath = findExecutable(arg);
                     msg = executablePath != null ? arg + " is " + executablePath : arg + ": not found";
                 }
-                printWithRedirect(msg, stdoutFile);
+                printWithRedirect(msg, stdoutFile, appendStdout);
 
             } else {
                 String executablePath = findExecutable(command);
@@ -111,7 +117,11 @@ public class Main {
 
                     if (stdoutFile != null) {
                         if (stdoutFile.getParentFile() != null) stdoutFile.getParentFile().mkdirs();
-                        pb.redirectOutput(stdoutFile);
+                        if (appendStdout) {
+                            pb.redirectOutput(ProcessBuilder.Redirect.appendTo(stdoutFile));
+                        } else {
+                            pb.redirectOutput(stdoutFile);
+                        }
                     } else {
                         pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                     }
@@ -134,12 +144,13 @@ public class Main {
     }
 
     /** Prints a line either to stdout or to a file, depending on redirection. */
-    private static void printWithRedirect(String line, File redirectFile) throws Exception {
+    private static void printWithRedirect(String line, File redirectFile, boolean append) throws Exception {
         if (redirectFile == null) {
             System.out.println(line);
         } else {
             if (redirectFile.getParentFile() != null) redirectFile.getParentFile().mkdirs();
-            try (PrintStream ps = new PrintStream(redirectFile)) {
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(redirectFile, append);
+                 PrintStream ps = new PrintStream(fos)) {
                 ps.println(line);
             }
         }
