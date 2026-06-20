@@ -134,8 +134,10 @@ public class Main {
                 printWithRedirect(msg, stdoutFile, appendStdout);
 
             } else if (command.equals("jobs")) {
-                for (Job job : backgroundJobs) {
-                    System.out.printf("[%d]+  %-24s%s\n", job.id, "Running", job.command);
+                for (int i = 0; i < backgroundJobs.size(); i++) {
+                    Job job = backgroundJobs.get(i);
+                    char marker = (i == backgroundJobs.size() - 1) ? '+' : (i == backgroundJobs.size() - 2) ? '-' : ' ';
+                    System.out.printf("[%d]%c  %-24s%s\n", job.id, marker, "Running", job.command);
                 }
 
             } else {
