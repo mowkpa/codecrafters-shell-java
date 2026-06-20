@@ -14,6 +14,7 @@ public class Main {
 
         while (true) {
             System.out.print("$ ");
+
             String input = scanner.nextLine();
 
             if (input.equals("exit 0")) {
@@ -74,12 +75,12 @@ public class Main {
             return null;
         }
 
-        String[] paths = pathEnv.split(File.pathSeparator);
+        String[] paths = pathEnv.split(":");
 
         for (String dir : paths) {
             File file = new File(dir, command);
 
-            if (file.exists() && file.isFile()) {
+            if (file.isFile() && file.canExecute()) {
                 return file.getAbsolutePath();
             }
         }
