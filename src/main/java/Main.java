@@ -23,6 +23,12 @@ public class Main {
             // Parse input into tokens, respecting quotes and backslash escaping
             List<String> tokens = parseTokens(input);
             if (tokens.isEmpty()) continue;
+            boolean runInBackground = false;
+            if (tokens.get(tokens.size() - 1).equals("&")) {
+                runInBackground = true;
+                tokens.remove(tokens.size() - 1);
+            }
+            if (tokens.isEmpty()) continue;
 
             // ── Extract redirection from token list ──────────
             File stdoutFile = null;
@@ -147,8 +153,12 @@ public class Main {
                     }
                     
                     pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
-
-                    pb.start().waitFor();
+                    Process process = pb.start();
+                    if (runInBackground) {
+                        System.out.println("[1] " + process.pid());
+                    } else {
+                        process.waitFor();
+                    }
                 } else {
                     System.out.println(command + ": not found");
                 }
