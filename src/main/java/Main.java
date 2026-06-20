@@ -12,6 +12,22 @@ public class Main {
     private static final Set<String> BUILTINS =
             new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd", "cd", "jobs"));
 
+    private static class Job {
+        int id;
+        long pid;
+        String command;
+        Process process;
+
+        Job(int id, long pid, String command, Process process) {
+            this.id = id;
+            this.pid = pid;
+            this.command = command;
+            this.process = process;
+        }
+    }
+
+    private static final List<Job> backgroundJobs = new ArrayList<>();
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
 
@@ -118,7 +134,9 @@ public class Main {
                 printWithRedirect(msg, stdoutFile, appendStdout);
 
             } else if (command.equals("jobs")) {
-                // Empty implementation for now
+                for (Job job : backgroundJobs) {
+                    System.out.printf("[%d]+  %-24s%s\n", job.id, "Running", job.command);
+                }
 
             } else {
                 String executablePath = findExecutable(command);
@@ -155,7 +173,9 @@ public class Main {
                     pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
                     Process process = pb.start();
                     if (runInBackground) {
-                        System.out.println("[1] " + process.pid());
+                        int jobId = backgroundJobs.size() + 1;
+                        backgroundJobs.add(new Job(jobId, process.pid(), input, process));
+                        System.out.println("[" + jobId + "] " + process.pid());
                     } else {
                         process.waitFor();
                     }
