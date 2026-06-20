@@ -112,6 +112,7 @@ public class Main {
             char c = input.charAt(i);
 
             if (inSingleQuote) {
+                // Inside single quotes: everything is literal, no escaping
                 if (c == '\'') {
                     inSingleQuote = false;
                 } else {
@@ -119,6 +120,7 @@ public class Main {
                     hasToken = true;
                 }
             } else if (inDoubleQuote) {
+                // Inside double quotes: everything literal for now ($ and \ in later stages)
                 if (c == '"') {
                     inDoubleQuote = false;
                 } else {
@@ -126,12 +128,21 @@ public class Main {
                     hasToken = true;
                 }
             } else {
-                if (c == '\'') {
+                // Unquoted context
+                if (c == '\\') {
+                    // Backslash: consume next character literally (strip the backslash)
+                    if (i + 1 < input.length()) {
+                        i++;
+                        current.append(input.charAt(i));
+                        hasToken = true;
+                    }
+                    // Trailing backslash at end of line is ignored
+                } else if (c == '\'') {
                     inSingleQuote = true;
-                    hasToken = true; // even empty '' starts a token
+                    hasToken = true;
                 } else if (c == '"') {
                     inDoubleQuote = true;
-                    hasToken = true; // even empty "" starts a token
+                    hasToken = true;
                 } else if (c == ' ' || c == '\t') {
                     // Unquoted whitespace = token delimiter
                     if (hasToken) {
