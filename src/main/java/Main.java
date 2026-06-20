@@ -97,6 +97,7 @@ public class Main {
      * Parses a shell input line into a list of tokens.
      * Handles:
      *  - Single-quoted strings: all chars literal, spaces preserved
+     *  - Double-quoted strings: all chars literal (spaces preserved); $ and \ special in later stages
      *  - Unquoted whitespace: used as delimiter (collapsed)
      *  - Adjacent quoted/unquoted segments: concatenated into one token
      */
@@ -104,24 +105,33 @@ public class Main {
         List<String> tokens = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingleQuote = false;
-        boolean hasToken = false; // tracks if we've started building a token
+        boolean inDoubleQuote = false;
+        boolean hasToken = false;
 
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
 
             if (inSingleQuote) {
                 if (c == '\'') {
-                    // End of single-quoted segment
                     inSingleQuote = false;
+                } else {
+                    current.append(c);
+                    hasToken = true;
+                }
+            } else if (inDoubleQuote) {
+                if (c == '"') {
+                    inDoubleQuote = false;
                 } else {
                     current.append(c);
                     hasToken = true;
                 }
             } else {
                 if (c == '\'') {
-                    // Start of single-quoted segment
                     inSingleQuote = true;
-                    hasToken = true; // even empty '' counts as starting a token
+                    hasToken = true; // even empty '' starts a token
+                } else if (c == '"') {
+                    inDoubleQuote = true;
+                    hasToken = true; // even empty "" starts a token
                 } else if (c == ' ' || c == '\t') {
                     // Unquoted whitespace = token delimiter
                     if (hasToken) {
