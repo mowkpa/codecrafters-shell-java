@@ -19,7 +19,7 @@ public class Main {
 
             String input = scanner.nextLine();
 
-            // Parse input into tokens, respecting single quotes
+            // Parse input into tokens, respecting quotes and backslash escaping
             List<String> tokens = parseTokens(input);
             if (tokens.isEmpty()) continue;
 
@@ -75,7 +75,6 @@ public class Main {
             } else {
                 String executablePath = findExecutable(command);
                 if (executablePath != null) {
-                    // Build the command list: command + args (already parsed/unquoted)
                     List<String> cmd = new ArrayList<>();
                     cmd.add(command);
                     cmd.addAll(cmdArgs);
@@ -96,9 +95,10 @@ public class Main {
     /**
      * Parses a shell input line into a list of tokens.
      * Handles:
-     *  - Single-quoted strings: all chars literal, spaces preserved
-     *  - Double-quoted strings: all chars literal (spaces preserved); $ and \ special in later stages
-     *  - Unquoted whitespace: used as delimiter (collapsed)
+     *  - Single-quoted strings: ALL chars literal (no escaping at all)
+     *  - Double-quoted strings: \ only escapes " \ $ ` and newline; all other \x kept literally
+     *  - Unquoted: \ escapes the next char unconditionally
+     *  - Unquoted whitespace: token delimiter (collapsed)
      *  - Adjacent quoted/unquoted segments: concatenated into one token
      */
     private static List<String> parseTokens(String input) {
@@ -112,21 +112,34 @@ public class Main {
             char c = input.charAt(i);
 
             if (inSingleQuote) {
-                // Inside single quotes: everything is literal, no escaping
+                // Inside single quotes: everything is literal, no escaping whatsoever
                 if (c == '\'') {
                     inSingleQuote = false;
                 } else {
                     current.append(c);
                     hasToken = true;
                 }
+
             } else if (inDoubleQuote) {
-                // Inside double quotes: everything literal for now ($ and \ in later stages)
+                // Inside double quotes: \ only escapes " \ $ ` and newline
                 if (c == '"') {
                     inDoubleQuote = false;
+                } else if (c == '\\' && i + 1 < input.length()) {
+                    char next = input.charAt(i + 1);
+                    if (next == '"' || next == '\\' || next == '$' || next == '`' || next == '\n') {
+                        // Consume the backslash; append the escaped char literally
+                        i++;
+                        current.append(next);
+                    } else {
+                        // Backslash is NOT special here — keep it as-is
+                        current.append(c);
+                    }
+                    hasToken = true;
                 } else {
                     current.append(c);
                     hasToken = true;
                 }
+
             } else {
                 // Unquoted context
                 if (c == '\\') {
