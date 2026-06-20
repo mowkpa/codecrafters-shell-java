@@ -28,6 +28,7 @@ public class Main {
             File stdoutFile = null;
             File stderrFile = null;
             boolean appendStdout = false;
+            boolean appendStderr = false;
             List<String> cleanTokens = new ArrayList<>();
             for (int i = 0; i < tokens.size(); i++) {
                 String tok = tokens.get(i);
@@ -39,8 +40,13 @@ public class Main {
                     stdoutFile = new File(tokens.get(i + 1));
                     appendStdout = false;
                     i++; // skip the filename token
+                } else if (tok.equals("2>>") && i + 1 < tokens.size()) {
+                    stderrFile = new File(tokens.get(i + 1));
+                    appendStderr = true;
+                    i++; // skip the filename token
                 } else if (tok.equals("2>") && i + 1 < tokens.size()) {
                     stderrFile = new File(tokens.get(i + 1));
+                    appendStderr = false;
                     i++; // skip the filename token
                 } else {
                     cleanTokens.add(tok);
@@ -55,7 +61,7 @@ public class Main {
             }
             if (stderrFile != null) {
                 if (stderrFile.getParentFile() != null) stderrFile.getParentFile().mkdirs();
-                new java.io.FileOutputStream(stderrFile).close();
+                new java.io.FileOutputStream(stderrFile, appendStderr).close();
             }
             // ─────────────────────────────────────────────────────────────────
 
@@ -90,7 +96,7 @@ public class Main {
                 if (dir.exists() && dir.isDirectory()) {
                     System.setProperty("user.dir", dir.getCanonicalPath());
                 } else {
-                    printErrWithRedirect("cd: " + target + ": No such file or directory", stderrFile);
+                    printErrWithRedirect("cd: " + target + ": No such file or directory", stderrFile, appendStderr);
                 }
 
             } else if (command.equals("type")) {
@@ -128,7 +134,11 @@ public class Main {
 
                     if (stderrFile != null) {
                         if (stderrFile.getParentFile() != null) stderrFile.getParentFile().mkdirs();
-                        pb.redirectError(stderrFile);
+                        if (appendStderr) {
+                            pb.redirectError(ProcessBuilder.Redirect.appendTo(stderrFile));
+                        } else {
+                            pb.redirectError(stderrFile);
+                        }
                     } else {
                         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                     }
@@ -157,12 +167,13 @@ public class Main {
     }
 
     /** Prints a line either to stderr or to a file, depending on redirection. */
-    private static void printErrWithRedirect(String line, File redirectFile) throws Exception {
+    private static void printErrWithRedirect(String line, File redirectFile, boolean append) throws Exception {
         if (redirectFile == null) {
             System.err.println(line);
         } else {
             if (redirectFile.getParentFile() != null) redirectFile.getParentFile().mkdirs();
-            try (PrintStream ps = new PrintStream(redirectFile)) {
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(redirectFile, append);
+                 PrintStream ps = new PrintStream(fos)) {
                 ps.println(line);
             }
         }
