@@ -7,7 +7,7 @@ import java.util.Set;
 public class Main {
 
     private static final Set<String> BUILTINS =
-            new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd"));
+            new HashSet<>(Arrays.asList("echo", "exit", "type", "pwd", "cd"));
 
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
@@ -36,6 +36,20 @@ public class Main {
                 }
             } else if (command.equals("pwd")) {
                 System.out.println(System.getProperty("user.dir"));
+            } else if (command.equals("cd")) {
+                if (parts.length < 2 || parts[1].trim().isEmpty()) {
+                    // cd with no argument — go to home (ignore for now)
+                    continue;
+                }
+                String target = parts[1].trim();
+                File dir = new File(target).isAbsolute()
+                        ? new File(target)
+                        : new File(System.getProperty("user.dir"), target);
+                if (dir.exists() && dir.isDirectory()) {
+                    System.setProperty("user.dir", dir.getCanonicalPath());
+                } else {
+                    System.err.println("cd: " + target + ": No such file or directory");
+                }
             } else if (command.equals("type")) {
                 if (parts.length < 2) {
                     continue;
@@ -62,6 +76,7 @@ public class Main {
 
                     Process process = new ProcessBuilder(tokens)
                             .inheritIO()
+                            .directory(new File(System.getProperty("user.dir")))
                             .start();
 
                     process.waitFor();
