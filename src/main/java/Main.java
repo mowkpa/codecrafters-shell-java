@@ -42,6 +42,15 @@ public class Main {
             }
             tokens = cleanTokens;
             if (tokens.isEmpty()) continue;
+
+            if (stdoutFile != null) {
+                if (stdoutFile.getParentFile() != null) stdoutFile.getParentFile().mkdirs();
+                new java.io.FileOutputStream(stdoutFile).close();
+            }
+            if (stderrFile != null) {
+                if (stderrFile.getParentFile() != null) stderrFile.getParentFile().mkdirs();
+                new java.io.FileOutputStream(stderrFile).close();
+            }
             // ─────────────────────────────────────────────────────────────────
 
             String command = tokens.get(0);
