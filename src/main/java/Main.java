@@ -24,13 +24,17 @@ public class Main {
             List<String> tokens = parseTokens(input);
             if (tokens.isEmpty()) continue;
 
-            // ── Extract stdout redirection (> or 1>) from token list ──────────
+            // ── Extract redirection from token list ──────────
             File stdoutFile = null;
+            File stderrFile = null;
             List<String> cleanTokens = new ArrayList<>();
             for (int i = 0; i < tokens.size(); i++) {
                 String tok = tokens.get(i);
                 if ((tok.equals(">") || tok.equals("1>")) && i + 1 < tokens.size()) {
                     stdoutFile = new File(tokens.get(i + 1));
+                    i++; // skip the filename token
+                } else if (tok.equals("2>") && i + 1 < tokens.size()) {
+                    stderrFile = new File(tokens.get(i + 1));
                     i++; // skip the filename token
                 } else {
                     cleanTokens.add(tok);
@@ -71,7 +75,7 @@ public class Main {
                 if (dir.exists() && dir.isDirectory()) {
                     System.setProperty("user.dir", dir.getCanonicalPath());
                 } else {
-                    System.err.println("cd: " + target + ": No such file or directory");
+                    printErrWithRedirect("cd: " + target + ": No such file or directory", stderrFile);
                 }
 
             } else if (command.equals("type")) {
@@ -97,13 +101,20 @@ public class Main {
                             .directory(new File(System.getProperty("user.dir")));
 
                     if (stdoutFile != null) {
-                        // Ensure parent directories exist
                         if (stdoutFile.getParentFile() != null) stdoutFile.getParentFile().mkdirs();
-                        pb.redirectOutput(stdoutFile);          // stdout → file
-                        pb.redirectError(ProcessBuilder.Redirect.INHERIT); // stderr → terminal
+                        pb.redirectOutput(stdoutFile);
                     } else {
-                        pb.inheritIO();
+                        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                     }
+
+                    if (stderrFile != null) {
+                        if (stderrFile.getParentFile() != null) stderrFile.getParentFile().mkdirs();
+                        pb.redirectError(stderrFile);
+                    } else {
+                        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                    }
+                    
+                    pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
 
                     pb.start().waitFor();
                 } else {
@@ -117,6 +128,18 @@ public class Main {
     private static void printWithRedirect(String line, File redirectFile) throws Exception {
         if (redirectFile == null) {
             System.out.println(line);
+        } else {
+            if (redirectFile.getParentFile() != null) redirectFile.getParentFile().mkdirs();
+            try (PrintStream ps = new PrintStream(redirectFile)) {
+                ps.println(line);
+            }
+        }
+    }
+
+    /** Prints a line either to stderr or to a file, depending on redirection. */
+    private static void printErrWithRedirect(String line, File redirectFile) throws Exception {
+        if (redirectFile == null) {
+            System.err.println(line);
         } else {
             if (redirectFile.getParentFile() != null) redirectFile.getParentFile().mkdirs();
             try (PrintStream ps = new PrintStream(redirectFile)) {
